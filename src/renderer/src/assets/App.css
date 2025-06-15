@@ -1,0 +1,7 @@
+@import '../../../index.css';
+
+:root {
+  /* index.cssで定義された --background の値をここで上書きします */
+  --background: oklch(0.98 0 0);
+  /* ← ここで背景色を濃いグレーに設定 */
+}
