@@ -2,6 +2,7 @@ import dns from 'dns'
 import { net as electronNet } from 'electron'
 import http from 'http'
 import net from 'net'
+import Stream from 'stream'
 import { URL } from 'url'
 
 const PROXY_PORT = 8899
@@ -74,48 +75,51 @@ const proxyServer = http.createServer(async (clientReq, clientRes) => {
 })
 
 // HTTPSのCONNECTメソッドに対する処理
-proxyServer.on('connect', (req, clientSocket, head) => {
+proxyServer.on('connect', async (req, clientSocket, head): Promise<Stream.Duplex | void> => {
   if (!req.url) return clientSocket.end()
   const { port, hostname } = new URL(`http://${req.url}`)
   if (!hostname) return clientSocket.end()
 
-  const lookup = async (callback): Promise<void> => {
-    try {
-      if (!currentDnsServer) {
-        const resolved = await electronNet.resolveHost(hostname)
-        if (!resolved.endpoints || resolved.endpoints.length === 0) {
-          throw new Error(`No valid endpoints found for ${hostname}`)
-        }
-        callback(null, resolved.endpoints[0].address)
-      } else {
-        const resolver = new dns.promises.Resolver()
-        resolver.setServers([currentDnsServer])
-        const addresses = await resolver.resolve4(hostname)
-        callback(null, addresses[0])
+  const lookup = async (): Promise<string> => {
+    if (!currentDnsServer) {
+      const resolved = await electronNet.resolveHost(hostname)
+      if (!resolved.endpoints || resolved.endpoints.length === 0) {
+        throw new Error(`No valid endpoints found for ${hostname}`)
       }
-    } catch (err) {
-      callback(err, '')
+      return resolved.endpoints[0].address // 成功時は値をreturn
+    } else {
+      const resolver = new dns.promises.Resolver()
+      resolver.setServers([currentDnsServer])
+      const addresses = await resolver.resolve4(hostname)
+      if (!addresses || addresses.length === 0) {
+        throw new Error(`No IPv4 addresses found for ${hostname}`)
+      }
+      return addresses[0] // 成功時は値をreturn
     }
   }
+  clientSocket.on('error', (err) => {
+    // clientSocket自体のエラーハンドリング
+    console.error(`[Client Socket Error]`, err)
+  })
+  try {
+    const address = await lookup()
 
-  lookup((err, address) => {
-    if (err || !address) {
-      clientSocket.end()
-      return
-    }
     const serverSocket = net.connect(Number(port) || 443, address, () => {
       clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
       serverSocket.write(head)
       serverSocket.pipe(clientSocket)
       clientSocket.pipe(serverSocket)
     })
+
     serverSocket.on('error', (socketErr) => {
       console.error(`[CONNECT Error] Failed to connect to ${hostname}:${port}`, socketErr)
       clientSocket.end()
     })
-  })
-
-  clientSocket.on('error', () => {})
+  } catch (err) {
+    // lookup でエラーが発生した場合の処理
+    console.error(`[DNS Lookup Error] in CONNECT method for ${hostname}:`, err)
+    clientSocket.end()
+  }
 })
 
 /**

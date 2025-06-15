@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
-import type { DnsConfig } from '../App'
+import type { DnsConfig } from '../../../types/ipc'
 import { Button } from './ui/button'
 import {
   Dialog,
