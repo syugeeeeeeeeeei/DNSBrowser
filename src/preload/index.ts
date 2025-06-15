@@ -6,7 +6,15 @@ const api: IpcApi = {
   // DNS関連のAPIのみにする
   updateDnsConfig: (host: string) => ipcRenderer.send('update-dns-config', host),
   getDnsList: () => ipcRenderer.invoke('get-dns-list'),
-  saveDnsList: (dnsList) => ipcRenderer.send('save-dns-list', dnsList)
+  saveDnsList: (dnsList) => ipcRenderer.send('save-dns-list', dnsList),
+  onForceReload: (callback) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('force-reload', listener)
+    // リスナーを解除するための関数を返す
+    return () => {
+      ipcRenderer.removeListener('force-reload', listener)
+    }
+  }
 }
 
 if (process.contextIsolated) {

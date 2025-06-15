@@ -1,5 +1,5 @@
 import dns from 'dns'
-import { net as electronNet } from 'electron'
+import { net as electronNet, session } from 'electron'
 import http from 'http'
 import net from 'net'
 import Stream from 'stream'
@@ -9,6 +9,7 @@ const PROXY_PORT = 8899
 let currentDnsServer: string | null = null
 
 const proxyServer = http.createServer(async (clientReq, clientRes) => {
+  console.log(`[Proxy HTTP] Request received for: ${clientReq.url}`)
   const url = new URL(clientReq.url!, `http://${clientReq.headers.host}`)
 
   try {
@@ -76,6 +77,7 @@ const proxyServer = http.createServer(async (clientReq, clientRes) => {
 
 // HTTPSのCONNECTメソッドに対する処理
 proxyServer.on('connect', async (req, clientSocket, head): Promise<Stream.Duplex | void> => {
+  console.log(`[Proxy CONNECT] Tunnel request received for: ${req.url}`)
   if (!req.url) return clientSocket.end()
   const { port, hostname } = new URL(`http://${req.url}`)
   if (!hostname) return clientSocket.end()
@@ -136,9 +138,20 @@ export function startProxyServer(): http.Server {
  * プロキシが使用するDNSサーバーを更新します。
  * @param host - DNSサーバーのホストIP。空文字列の場合はOSデフォルトを使用します。
  */
-export function updateProxyDns(host: string): void {
+export async function updateProxyDns(host: string): Promise<void> {
   currentDnsServer = host === '' ? null : host
   console.log(`Proxy DNS updated to: ${currentDnsServer || 'OS Default'}`)
+
+  // WebViewが使用している特定のセッションを取得
+  const webviewSession = session.fromPartition('persist:dns_browser_session')
+
+  try {
+    // このセッションのDNS解決キャッシュをクリアする
+    await webviewSession.clearHostResolverCache()
+    console.log('[DNS Switch] Host resolver cache cleared successfully.')
+  } catch (err) {
+    console.error('[DNS Switch] Failed to clear host resolver cache:', err)
+  }
 }
 
 export function getProxyPort(): number {

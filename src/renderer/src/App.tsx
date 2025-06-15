@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import './assets/App.css'
 import { Controls } from './components/Controls'
 import { DnsDialog } from './components/DnsDialog'
@@ -9,6 +9,9 @@ import { useDns } from './hooks/useDns'
 import { useWebView } from './hooks/useWebView'
 
 function App(): React.JSX.Element {
+  const [webviewKey, setWebviewKey] = useState(1)
+
+  // ★ useWebViewにwebviewKeyを渡す
   const {
     webviewRef,
     navState,
@@ -17,16 +20,32 @@ function App(): React.JSX.Element {
     handleNavigate,
     handleLoadUrl,
     eventHandlers
-  } = useWebView()
+  } = useWebView(webviewKey)
 
   const { dnsList, selectedDns, isModalOpen, setIsModalOpen, handleDnsChange, handleSaveDnsList } =
     useDns({
-      onDnsChangeCallback: () => {
-        if (isWebViewReady && navState.url) {
-          handleNavigate('reload')
-        }
+      onDnsChangeCallback: () => { /* no-op */ }
+    })
+
+  const [urlToReload, setUrlToReload] = useState<string | null>(null)
+
+  useEffect(() => {
+    const removeListener = window.api.onForceReload(() => {
+      if (navState.url && navState.url !== 'about:blank') {
+        setUrlToReload(navState.url)
+        setWebviewKey((prevKey) => prevKey + 1)
       }
     })
+    return () => removeListener()
+  }, [navState.url])
+
+  useEffect(() => {
+    if (urlToReload && isWebViewReady) {
+      handleLoadUrl(urlToReload)
+      setUrlToReload(null)
+    }
+  }, [urlToReload, isWebViewReady, handleLoadUrl])
+
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -41,9 +60,8 @@ function App(): React.JSX.Element {
         onEditDns={() => setIsModalOpen(true)}
       />
       <div className="relative flex-grow">
-        {/* ★ URLが初期状態('')または'about:blank'の時にWelcomeSplashを表示 */}
         {(navState.url === '' || navState.url === 'about:blank') && <WelcomeSplash />}
-        <WebView ref={webviewRef} {...eventHandlers} />
+        <WebView key={webviewKey} ref={webviewRef} {...eventHandlers} />
         {loadError && <ErrorDisplay error={loadError} onReload={() => handleNavigate('reload')} />}
       </div>
       <DnsDialog

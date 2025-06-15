@@ -13,7 +13,7 @@ function createWindow(): void {
     width: 1200,
     height: 800,
     show: false,
-    autoHideMenuBar: true,
+    // autoHideMenuBar: true,
     icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -49,7 +49,7 @@ app.whenReady().then(() => {
 
   // プロキシとIPCハンドラを初期化
   proxyServer = startProxyServer()
-  registerIpcHandlers()
+
 
   app.on('certificate-error', (event, _webContents, _url, _error, _certificate, callback) => {
     event.preventDefault()
@@ -61,6 +61,7 @@ app.whenReady().then(() => {
   })
 
   createWindow()
+  registerIpcHandlers(mainWindow)
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

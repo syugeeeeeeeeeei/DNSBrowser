@@ -8,4 +8,5 @@ export interface IpcApi {
   updateDnsConfig: (host: string) => void
   getDnsList: () => Promise<DnsConfig[]>
   saveDnsList: (dnsList: DnsConfig[]) => void
+  onForceReload: (callback: () => void) => () => void
 }
