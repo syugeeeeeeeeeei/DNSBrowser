@@ -2,8 +2,7 @@
 
 指定したDNSサーバーを利用してウェブサイトを閲覧するための、Electron製のシンプルなデスクトップブラウザです。
 
-![Screenshot of DNS Based Browser](https://via.placeholder.com/800x500.png?text=App+Screenshot)
-*(ここにアプリケーションのスクリーンショットを挿入してください)*
+![Screenshot of DNS Based Browser](./resources/welcome.png)
 
 ---
 
