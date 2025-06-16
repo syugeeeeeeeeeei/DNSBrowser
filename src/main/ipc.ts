@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, session } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import type { DnsConfig } from '../types/ipc'
 import { updateProxyDns } from './proxy'
 import { store } from './store'
@@ -33,5 +34,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       // ★ エラーが発生した場合、コンソールに出力する
       console.error('Failed to update DNS config and clear cache:', error)
     }
+  })
+
+  // ★ 追加: アップデート関連のIPCハンドラ
+  ipcMain.on('quit-and-install', () => {
+    autoUpdater.quitAndInstall()
+  })
+
+  ipcMain.on('download-update', () => {
+    autoUpdater.downloadUpdate()
   })
 }

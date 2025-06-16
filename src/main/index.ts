@@ -1,5 +1,7 @@
+// src/main/index.ts
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow, session, shell } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc'
@@ -61,6 +63,37 @@ app.whenReady().then(() => {
 
   createWindow()
   registerIpcHandlers(mainWindow)
+
+  autoUpdater.autoDownload = false // 自動ダウンロードを無効化（任意）
+  autoUpdater.autoInstallOnAppQuit = true // アプリ終了時に自動インストール
+
+  // アップデート利用可能イベント
+  autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info)
+    mainWindow.webContents.send('update-available', info.version)
+  })
+
+  // アップデートダウンロード済みイベント
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('Update downloaded:', info)
+    mainWindow.webContents.send('update-downloaded', info.version)
+  })
+
+  // ★ 追加: ダウンロード進捗イベント
+  autoUpdater.on('download-progress', (progressObj) => {
+    console.log('Download progress:', progressObj)
+    mainWindow.webContents.send('update-downloading', progressObj)
+  })
+
+  // エラーイベント
+  autoUpdater.on('error', (err) => {
+    console.error('Error in autoUpdater:', err)
+    mainWindow.webContents.send('update-error', err.message)
+  })
+
+  if (!is.dev) {
+    autoUpdater.checkForUpdatesAndNotify()
+  }
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

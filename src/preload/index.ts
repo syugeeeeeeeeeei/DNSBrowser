@@ -1,3 +1,4 @@
+// src/preload/index.ts
 import { electronAPI } from '@electron-toolkit/preload'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcApi } from '../types/ipc'
@@ -13,6 +14,38 @@ const api: IpcApi = {
     // リスナーを解除するための関数を返す
     return () => {
       ipcRenderer.removeListener('force-reload', listener)
+    }
+  },
+  // アップデート関連のAPI
+  onUpdateAvailable: (callback) => {
+    const listener = (_event, version: string): void => callback(version)
+    ipcRenderer.on('update-available', listener)
+    return () => {
+      ipcRenderer.removeListener('update-available', listener)
+    }
+  },
+  onUpdateDownloaded: (callback) => {
+    const listener = (_event, version: string): void => callback(version)
+    ipcRenderer.on('update-downloaded', listener)
+    return () => {
+      ipcRenderer.removeListener('update-downloaded', listener)
+    }
+  },
+  onUpdateError: (callback) => {
+    const listener = (_event, message: string): void => callback(message)
+    ipcRenderer.on('update-error', listener)
+    return () => {
+      ipcRenderer.removeListener('update-error', listener)
+    }
+  },
+  quitAndInstall: () => ipcRenderer.send('quit-and-install'),
+  downloadUpdate: () => ipcRenderer.send('download-update'),
+  onUpdateDownloading: (callback) => {
+    // ★ 追加
+    const listener = (_event, progress: { percent: number }): void => callback(progress)
+    ipcRenderer.on('update-downloading', listener)
+    return () => {
+      ipcRenderer.removeListener('update-downloading', listener)
     }
   }
 }
