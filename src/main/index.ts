@@ -50,7 +50,6 @@ app.whenReady().then(() => {
   // プロキシとIPCハンドラを初期化
   proxyServer = startProxyServer()
 
-
   app.on('certificate-error', (event, _webContents, _url, _error, _certificate, callback) => {
     event.preventDefault()
     callback(true)
