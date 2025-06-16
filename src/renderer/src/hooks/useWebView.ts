@@ -1,6 +1,7 @@
+// src/renderer/src/hooks/useWebView.ts
 import type { WebviewTag } from 'electron'
 import type { RefObject } from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { LoadError, NavState } from '../../../types/renderer'
 import type { WebViewProps } from '../components/WebView'
 
@@ -9,13 +10,12 @@ export interface UseWebView {
   navState: NavState
   loadError: LoadError | null
   isWebViewReady: boolean
-  handleNavigate: (action: 'back' | 'forward' | 'reload' | 'reload-ignoring-cache') => void
+  handleNavigate: (action: 'back' | 'forward' | 'reload') => void
   handleLoadUrl: (url: string) => void
   eventHandlers: WebViewProps
 }
 
-// ★ keyを引数として受け取るように変更
-export function useWebView(key: number): UseWebView {
+export function useWebView(): UseWebView {
   const webviewRef = useRef<WebviewTag>(null)
   const [isWebViewReady, setIsWebViewReady] = useState(false)
   const [navState, setNavState] = useState<NavState>({
@@ -25,20 +25,8 @@ export function useWebView(key: number): UseWebView {
   })
   const [loadError, setLoadError] = useState<LoadError | null>(null)
 
-  // ★★★ keyの変更を検知して、フックの内部状態をすべて初期値にリセットする
-  useEffect(() => {
-    console.log(`WebView key changed to ${key}, resetting state.`)
-    setIsWebViewReady(false)
-    setNavState({
-      url: '',
-      canGoBack: false,
-      canGoForward: false
-    })
-    setLoadError(null)
-  }, [key]) // 依存配列にkeyを指定
-
   const handleNavigate = useCallback(
-    (action: 'back' | 'forward' | 'reload' | 'reload-ignoring-cache'): void => {
+    (action: 'back' | 'forward' | 'reload'): void => {
       const wv = webviewRef.current
       if (!wv) return
 
@@ -47,7 +35,6 @@ export function useWebView(key: number): UseWebView {
       }
 
       if (action === 'reload') wv.reload()
-      else if (action === 'reload-ignoring-cache') wv.reloadIgnoringCache()
       else if (action === 'back') wv.goBack()
       else if (action === 'forward') wv.goForward()
     },

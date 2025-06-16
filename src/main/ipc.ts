@@ -20,18 +20,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   })
 
   ipcMain.on('update-dns-config', async (_, host: string) => {
-    // ★ try...catchブロックで非同期処理全体を囲む
     try {
       // 1. プロキシが使用するDNSを更新
       updateProxyDns(host)
-
-      // 2. 正しいセッションのDNSキャッシュをクリア
       const ses = session.fromPartition('persist:dns_browser_session')
-      await ses.clearCache()
-      await ses.clearCodeCaches({})
-      await ses.clearHostResolverCache()
+      // 2. 既存のTCPコネクションを閉じる ←これがDNS切り替えでキャッシュ消えるやつ～～～～～
+      await ses.closeAllConnections()
       console.log('Host resolver cache cleared for persist:dns_browser_session')
-
       // 3. レンダラープロセスに強制リロードを指示
       mainWindow.webContents.send('force-reload')
     } catch (error) {

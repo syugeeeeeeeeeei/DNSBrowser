@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+// src/renderer/src/App.tsx
+import React from 'react'
 import './assets/App.css'
 import { Controls } from './components/Controls'
 import { DnsDialog } from './components/DnsDialog'
@@ -9,9 +10,9 @@ import { useDns } from './hooks/useDns'
 import { useWebView } from './hooks/useWebView'
 
 function App(): React.JSX.Element {
-  const [webviewKey, setWebviewKey] = useState(1)
+  // webviewKey は不要になります
+  // const [webviewKey, setWebviewKey] = useState(1)
 
-  // ★ useWebViewにwebviewKeyを渡す
   const {
     webviewRef,
     navState,
@@ -20,32 +21,20 @@ function App(): React.JSX.Element {
     handleNavigate,
     handleLoadUrl,
     eventHandlers
-  } = useWebView(webviewKey)
+    // useWebView から key を取り除く
+  } = useWebView(/* key を渡さない */)
 
   const { dnsList, selectedDns, isModalOpen, setIsModalOpen, handleDnsChange, handleSaveDnsList } =
     useDns({
-      onDnsChangeCallback: () => { /* no-op */ }
-    })
-
-  const [urlToReload, setUrlToReload] = useState<string | null>(null)
-
-  useEffect(() => {
-    const removeListener = window.api.onForceReload(() => {
-      if (navState.url && navState.url !== 'about:blank') {
-        setUrlToReload(navState.url)
-        setWebviewKey((prevKey) => prevKey + 1)
+      onDnsChangeCallback: () => {
+        if (navState.url && navState.url !== 'about:blank') {
+          // DNS変更時にキャッシュを無視して強制リロード
+          handleNavigate('reload')
+        } else {
+          handleLoadUrl('about:blank') // 例: about:blank に戻す
+        }
       }
     })
-    return () => removeListener()
-  }, [navState.url])
-
-  useEffect(() => {
-    if (urlToReload && isWebViewReady) {
-      handleLoadUrl(urlToReload)
-      setUrlToReload(null)
-    }
-  }, [urlToReload, isWebViewReady, handleLoadUrl])
-
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -61,7 +50,7 @@ function App(): React.JSX.Element {
       />
       <div className="relative flex-grow">
         {(navState.url === '' || navState.url === 'about:blank') && <WelcomeSplash />}
-        <WebView key={webviewKey} ref={webviewRef} {...eventHandlers} />
+        <WebView ref={webviewRef} {...eventHandlers} />
         {loadError && <ErrorDisplay error={loadError} onReload={() => handleNavigate('reload')} />}
       </div>
       <DnsDialog
