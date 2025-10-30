@@ -3,6 +3,8 @@ export interface NavState {
   url: string
   canGoBack: boolean
   canGoForward: boolean
+  protocol: 'http:' | 'https:'
+  displayUrl: string
 }
 
 // ページの読み込みエラーの状態

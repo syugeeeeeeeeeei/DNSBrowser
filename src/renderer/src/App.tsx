@@ -4,6 +4,7 @@ import './assets/App.css'
 import { Controls } from './components/Controls'
 import { DnsDialog } from './components/DnsDialog'
 import { ErrorDisplay } from './components/ErrorDisplay'
+import { LoadingOverlay } from './components/LoadingOverlay'; // ★ 追加
 import { Button } from './components/ui/button'
 import {
   Dialog,
@@ -25,10 +26,15 @@ function App(): React.JSX.Element {
     navState,
     loadError,
     isWebViewReady,
+    isLoading, // ★ 追加
     handleNavigate,
     handleLoadUrl,
     eventHandlers
   } = useWebView()
+
+  // ★ プロトコルと表示URLの state を追加
+  const [protocol, setProtocol] = useState<'http:' | 'https:'>('https:')
+  const [displayUrl, setDisplayUrl] = useState('')
 
   const { dnsList, selectedDns, isModalOpen, setIsModalOpen, handleDnsChange, handleSaveDnsList } =
     useDns({
@@ -41,7 +47,19 @@ function App(): React.JSX.Element {
       }
     })
 
-  // ★ 変更: updateInfoのstatusに 'downloading' と progress を追加
+  // ★ WebViewのナビゲーション状態が変化したら、ローカルの state に反映する
+  useEffect(() => {
+    if (navState.url === '' || navState.url === 'about:blank') {
+      setDisplayUrl('')
+      // オプション: about:blank の場合はデフォルトの https に戻す
+      // setProtocol('https:')
+    } else {
+      setDisplayUrl(navState.displayUrl)
+      setProtocol(navState.protocol)
+    }
+  }, [navState])
+
+  // (アップデート関連のコードは変更なし)
   const [updateInfo, setUpdateInfo] = useState<{
     status: 'available' | 'downloading' | 'downloaded' | null
     version?: string
@@ -64,10 +82,9 @@ function App(): React.JSX.Element {
     })
 
     const removeUpdateDownloadingListener = window.api.onUpdateDownloading((progress) => {
-      // ★ 追加
       console.log('Downloading update:', progress.percent)
       setUpdateInfo((prev) => ({ ...prev, status: 'downloading', percent: progress.percent }))
-      setIsUpdateDialogVisible(true) // ダウンロード中にダイアログを表示し続ける
+      setIsUpdateDialogVisible(true)
     })
 
     const removeUpdateErrorListener = window.api.onUpdateError((message) => {
@@ -78,15 +95,14 @@ function App(): React.JSX.Element {
     return () => {
       removeUpdateAvailableListener()
       removeUpdateDownloadedListener()
-      removeUpdateDownloadingListener() // ★ 追加
+      removeUpdateDownloadingListener()
       removeUpdateErrorListener()
     }
   }, [])
 
   const handleDownloadUpdate = (): void => {
     window.api.downloadUpdate()
-    setUpdateInfo((prev) => ({ ...prev, status: 'downloading', percent: 0 })) // ダウンロード開始時に進捗をリセット
-    // setIsUpdateDialogVisible(false); // ダイアログを閉じずに進捗を表示
+    setUpdateInfo((prev) => ({ ...prev, status: 'downloading', percent: 0 }))
   }
 
   const handleQuitAndInstall = (): void => {
@@ -96,7 +112,16 @@ function App(): React.JSX.Element {
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <Controls
-        navState={navState}
+        // ★ navState から必要なものだけを渡す
+        canGoBack={navState.canGoBack}
+        canGoForward={navState.canGoForward}
+        navDisplayUrl={navState.displayUrl} // ★ onBlur で戻すための元URL
+        // ★ プロトコルと表示URLの state を渡す
+        protocol={protocol}
+        setProtocol={setProtocol}
+        displayUrl={displayUrl}
+        setDisplayUrl={setDisplayUrl}
+        // ★ 以下の props は変更なし
         dnsList={dnsList}
         selectedDnsHost={selectedDns}
         isWebViewReady={isWebViewReady}
@@ -106,9 +131,13 @@ function App(): React.JSX.Element {
         onEditDns={() => setIsModalOpen(true)}
       />
       <div className="relative flex-grow">
-        {(navState.url === '' || navState.url === 'about:blank') && <WelcomeSplash />}
+        {/* ★ isLoading が true の時にオーバーレイを表示 */}
+        {isLoading && <LoadingOverlay />}
+        {(navState.url === '' || navState.url === 'about:blank') && !isLoading && <WelcomeSplash />}
         <WebView ref={webviewRef} {...eventHandlers} />
-        {loadError && <ErrorDisplay error={loadError} onReload={() => handleNavigate('reload')} />}
+        {loadError && !isLoading && (
+          <ErrorDisplay error={loadError} onReload={() => handleNavigate('reload')} />
+        )}
       </div>
       <DnsDialog
         isOpen={isModalOpen}
@@ -117,7 +146,7 @@ function App(): React.JSX.Element {
         onSave={handleSaveDnsList}
       />
 
-      {/* アップデート通知ダイアログ */}
+      {/* アップデート通知ダイアログ (変更なし) */}
       {isUpdateDialogVisible && (
         <Dialog open={isUpdateDialogVisible} onOpenChange={setIsUpdateDialogVisible}>
           <DialogContent>
@@ -148,7 +177,7 @@ function App(): React.JSX.Element {
               {updateInfo.status === 'downloaded' && (
                 <Button onClick={handleQuitAndInstall}>今すぐインストールして再起動</Button>
               )}
-              {updateInfo.status !== 'downloading' && ( // ダウンロード中は「後で」を非表示にする
+              {updateInfo.status !== 'downloading' && (
                 <Button variant="outline" onClick={() => setIsUpdateDialogVisible(false)}>
                   {updateInfo.status === 'available' ? '後で' : '後で再起動'}
                 </Button>
