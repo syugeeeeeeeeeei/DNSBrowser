@@ -1,3 +1,4 @@
+// src/renderer/src/components/Controls.tsx
 import { cn } from '@/lib/utils'
 import { ArrowLeft, ArrowRight, Lock, LockOpen, RotateCw, Settings } from 'lucide-react'; // ★ Lock / LockOpen が必要
 import React from 'react'
@@ -80,11 +81,14 @@ export function Controls({
     e.currentTarget.select()
   }
 
+  // ★ 削除: handleInputBlur 関数
+  /*
   const handleInputBlur = (): void => {
     setTimeout(() => {
       setDisplayUrl(navDisplayUrl)
     }, 100)
   }
+  */
 
   const handleProtocolSwitch = (newProtocol: string): void => {
     if (newProtocol !== 'http:' && newProtocol !== 'https:') {
@@ -168,7 +172,7 @@ export function Controls({
         value={displayUrl}
         onChange={handleInputChange}
         onFocus={handleInputFocus}
-        onBlur={handleInputBlur}
+        // ★ 削除: onBlur={handleInputBlur}
         onKeyDown={handleUrlSubmit}
         className="h-9 flex-1"
         disabled={!isWebViewReady}
