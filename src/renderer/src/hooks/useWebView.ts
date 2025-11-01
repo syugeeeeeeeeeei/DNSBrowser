@@ -10,7 +10,7 @@ export interface UseWebView {
   navState: NavState
   loadError: LoadError | null
   isWebViewReady: boolean
-  isLoading: boolean // ★ 追加
+  isLoading: boolean
   handleNavigate: (action: 'back' | 'forward' | 'reload') => void
   handleLoadUrl: (url: string) => void
   eventHandlers: WebViewProps
@@ -19,13 +19,13 @@ export interface UseWebView {
 export function useWebView(): UseWebView {
   const webviewRef = useRef<WebviewTag>(null)
   const [isWebViewReady, setIsWebViewReady] = useState(false)
-  const [isLoading, setIsLoading] = useState(false) // ★ 追加
+  const [isLoading, setIsLoading] = useState(false)
   const [navState, setNavState] = useState<NavState>({
     url: '',
     canGoBack: false,
     canGoForward: false,
-    protocol: 'https:', // ★ 追加
-    displayUrl: '' // ★ 追加
+    protocol: 'https:',
+    displayUrl: ''
   })
   const [loadError, setLoadError] = useState<LoadError | null>(null)
 
@@ -34,22 +34,30 @@ export function useWebView(): UseWebView {
       const wv = webviewRef.current
       if (!wv) return
 
-      if (action === 'reload' && loadError) {
+      console.log(`[WebView Event] handleNavigate: ${action} が呼ばれました。`) // ★ ログ
+
+      if (action === 'reload') {
         setLoadError(null)
       }
-      setIsLoading(true) // ★ ナビゲーション開始時にローディング
+
+      // ★ ユーザー起点のローディング開始
+      setIsLoading(true)
+      console.log(`[WebView State] isLoading: true (handleNavigate)`) // ★ ログ
 
       if (action === 'reload') wv.reload()
       else if (action === 'back') wv.goBack()
       else if (action === 'forward') wv.goForward()
     },
-    [loadError]
+    []
   )
 
   const handleLoadUrl = useCallback((url: string): void => {
     if (webviewRef.current && url) {
+      console.log(`[WebView Event] handleLoadUrl: ${url} が呼ばれました。`) // ★ ログ
       setLoadError(null)
-      setIsLoading(true) // ★ URL読み込み開始時にローディング
+      // ★ ユーザー起点のローディング開始
+      setIsLoading(true)
+      console.log(`[WebView State] isLoading: true (handleLoadUrl)`) // ★ ログ
       webviewRef.current.loadURL(url)
     }
   }, [])
@@ -61,20 +69,17 @@ export function useWebView(): UseWebView {
       let protocol: 'http:' | 'https:' = 'https:'
       let displayUrl = ''
 
-      // ★ URLを解析して protocol と displayUrl を設定
       if (currentUrl && currentUrl !== 'about:blank') {
         try {
           const urlObj = new URL(currentUrl)
           protocol = urlObj.protocol as 'http:' | 'https:'
-          // ホスト名 + パス名 + 検索クエリ
           displayUrl = urlObj.hostname + urlObj.pathname + urlObj.search
-          // ルートパスで末尾が / の場合のみ削除 (e.g., "example.com/" -> "example.com")
           if (urlObj.pathname === '/' && urlObj.search === '') {
             displayUrl = urlObj.hostname
           }
         } catch (e) {
           console.error('Invalid URL in webview:', currentUrl)
-          displayUrl = currentUrl // 解析失敗時はそのまま表示
+          displayUrl = currentUrl
         }
       }
 
@@ -82,30 +87,64 @@ export function useWebView(): UseWebView {
         url: currentUrl,
         canGoBack: wv.canGoBack(),
         canGoForward: wv.canGoForward(),
-        protocol, // ★ 設定
-        displayUrl // ★ 設定
+        protocol,
+        displayUrl
       })
-      setIsLoading(false) // ★ ナビゲーション完了でローディング終了
     }
   }, [])
 
   const handleDomReady = useCallback(() => {
+    console.log('[WebView Event] dom-ready: WebViewの準備ができました。') // ★ ログ
     setIsWebViewReady(true)
   }, [])
 
-  const handleDidStartNavigation = useCallback((): void => {
-    setLoadError(null)
-    setIsLoading(true) // ★ ローディング開始
+  const handleDidStartNavigation = useCallback((e: Electron.DidStartNavigationEvent): void => {
+    console.log(
+      `[WebView Event] did-start-navigation: isMainFrame=${e.isMainFrame}, URL=${e.url}`
+    )
+
+    if (e.isMainFrame) {
+      setLoadError(null)
+      // ★ 修正: ここでは isLoading を true にしない
+      // setIsLoading(true) 
+      // console.log(`[WebView State] isLoading: true (did-start-navigation)`)
+    }
   }, [])
 
+  const handleDidNavigate = useCallback((e: Electron.DidNavigateEvent) => {
+    console.log(`[WebView Event] did-navigate: URL=${e.url}`) // ★ ログ
+    updateNavState()
+  }, [updateNavState])
+
+  const handleDidFinishLoad = useCallback(() => {
+    console.log('[WebView Event] did-finish-load: 読み込みが完了しました。') // ★ ログ
+    // ★ 読み込み完了でローディングを終了
+    setIsLoading(false)
+    console.log(`[WebView State] isLoading: false (did-finish-load)`) // ★ ログ
+    updateNavState()
+  }, [updateNavState])
+
   const handleFailLoad = useCallback((e: Electron.DidFailLoadEvent): void => {
-    if (e.errorCode === -3 || !e.isMainFrame) return
+    console.warn(
+      `[WebView Event] did-fail-load: isMainFrame=${e.isMainFrame}, Code=${e.errorCode}, URL=${e.validatedURL}`
+    )
+
+    if (!e.isMainFrame) return
+
+    if (e.errorCode === -3) {
+      console.log('[WebView Event] did-fail-load: ユーザーによる中断 (ERR_ABORTED) のため、ローディングのみ終了します。') // ★ ログ
+      setIsLoading(false)
+      console.log(`[WebView State] isLoading: false (did-fail-load, ERR_ABORTED)`) // ★ ログ
+      return
+    }
+
     setLoadError({
       code: e.errorCode,
       description: e.errorDescription,
       url: e.validatedURL
     })
     setIsLoading(false) // ★ ローディング終了
+    console.log(`[WebView State] isLoading: false (did-fail-load)`) // ★ ログ
   }, [])
 
   return {
@@ -113,14 +152,14 @@ export function useWebView(): UseWebView {
     navState,
     loadError,
     isWebViewReady,
-    isLoading, // ★ 追加
+    isLoading,
     handleNavigate,
     handleLoadUrl,
     eventHandlers: {
       onDomReady: handleDomReady,
       onDidStartNavigation: handleDidStartNavigation,
-      onDidNavigate: updateNavState,
-      onDidFinishLoad: updateNavState,
+      onDidNavigate: handleDidNavigate,
+      onDidFinishLoad: handleDidFinishLoad,
       onDidFailLoad: handleFailLoad
     }
   }
